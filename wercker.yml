@@ -1,0 +1,36 @@
+build:
+    box: google/golang
+    steps:
+
+    # Test the project
+    - script:
+        name: go test
+        code: go test ./...
+
+    # Statically build the project
+    - script:
+        name: go build
+        code: CGO_ENABLED=0 go build -a -ldflags '-s' -installsuffix cgo -o app .
+
+    # Copy binary to a location that gets passed along to the deploy pipeline
+    - script:
+        name: copy binary
+        code: cp app "$WERCKER_OUTPUT_DIR"
+    # Copy cert
+    - script:
+        name: copy cert
+        code: |
+          mkdir -p "$WERCKER_OUTPUT_DIR/etc/ssl/certs/"
+          cp /etc/ssl/certs/ca-certificates.crt  "$WERCKER_OUTPUT_DIR/etc/ssl/certs/"
+deploy:
+    box: google/golang
+    steps:
+     # Use the scratch step to build a container from scratch based on the files present
+    - internal/docker-scratch-push:
+        username: $QUAY_USERNAME
+        password: $QUAY_PASSWORD
+        cmd: ./app
+        tag: latest
+        ports: "8080"
+        repository: quay.io/miro_mt/dopsch
+        registry: https://quay.io
